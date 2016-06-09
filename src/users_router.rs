@@ -61,9 +61,9 @@ impl SessionTokenResponse {
 
 /// Body response for POST /users
 #[derive(Debug, RustcDecodable, RustcEncodable)]
-struct CreateUserResponse {
-    email: String,
-    activation_url: String
+pub struct CreateUserResponse {
+    pub email: String,
+    pub activation_url: String
 }
 
 /// Body response for GET /users/:id
