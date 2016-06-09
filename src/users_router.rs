@@ -62,6 +62,7 @@ impl SessionTokenResponse {
 /// Body response for POST /users
 #[derive(Debug, RustcDecodable, RustcEncodable)]
 struct CreateUserResponse {
+    email: String,
     activation_url: String
 }
 
@@ -250,7 +251,7 @@ impl UsersRouter {
         let body: CreateUserBody = parse_request_body!(req);
 
         let user = match UserBuilder::new(None)
-            .email(body.email)
+            .email(body.email.clone())
             .finalize() {
                 Ok(user) => user,
                 Err(user_with_error) => {
@@ -273,13 +274,14 @@ impl UsersRouter {
                 };
 
                 let activation_url = endpoint(
-                    &format!("/users/{}?auth={}",user.id, session_token)
+                    &format!("/users/{}/activate?auth={}",user.id, session_token)
                 );
 
                 // To help testing, we print the url here.
                 println!("New user: activation url {}", activation_url);
 
                 let body = match json::encode(&CreateUserResponse{
+                    email: body.email,
                     activation_url: activation_url
                 }) {
                     Ok(body) => body,
@@ -496,7 +498,7 @@ impl UsersRouter {
                     }
                 };
                 match db.update(&user) {
-                    Ok(_) => Ok(Response::with((status::NoContent))),
+                    Ok(_) => SessionTokenResponse::with_user(&user),
                     Err(error) => {
                         println!("{:?}", error);
                         from_sqlite_error(error)
@@ -640,7 +642,8 @@ impl UsersRouter {
         });
 
         let cors = CORS::new(vec![
-            (vec![Method::Post], endpoint("/login"))
+            (vec![Method::Post], endpoint("/login")),
+            (vec![Method::Put], endpoint("/users/:id/activate"))
         ]);
 
         let data = String::from(db_path);
@@ -709,7 +712,8 @@ describe! users_router_tests {
             use iron::method::Method;
 
             let endpoints = vec![
-                (vec![Method::Post], format!("{}/login", API_VERSION))
+                (vec![Method::Post], format!("{}/login", API_VERSION)),
+                (vec![Method::Put], format!("{}/users/:id/activate", API_VERSION))
             ];
             for endpoint in endpoints.clone() {
                 let (_, path) = endpoint;
@@ -1488,7 +1492,7 @@ describe! users_router_tests {
             };
         }
 
-        it "should return 204 NoContent activating a inactive user" {
+        it "should return 201 Created activating a inactive user" {
             let user = UserBuilder::new(None)
                        .email(String::from("username@example.com"))
                        .active(false)
@@ -1504,7 +1508,7 @@ describe! users_router_tests {
                                  \"password\": \"12345678\"}",
                                &router) {
                 Ok(response) => {
-                    assert_eq!(response.status.unwrap(), Status::NoContent);
+                    assert_eq!(response.status.unwrap(), Status::Created);
                     match usersDb.read(ReadFilter::Id(user.id)) {
                         Ok(users) => {
                             assert_eq!(users[0].name, "name".to_owned());

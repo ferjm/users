@@ -184,6 +184,7 @@ This activation url will contain a temporary session token that will be exchange
 HTTP/1.1 201 Created
 Connection: close
 {
+  "email": "user@domain.org",
   "activation_url": "/v1/users/InR5cCI6IkpXVCJ?auth=BWdsaxhZGRpbjpPcGVuU2VzYW1l"
 }
 ```
